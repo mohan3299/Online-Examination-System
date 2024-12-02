@@ -1,0 +1,185 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["extendedWhereUnique"]
+}
+
+model User {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                String
+  email               String    @unique
+  password            String
+  role                UserRole  @default(STUDENT)
+  lastPasswordResetAt DateTime? @map("last_password_reset_at")
+
+  sections  Section[]
+  schedules StudentSchedule[]
+
+  @@map("user")
+}
+
+enum UserRole {
+  ADMIN
+  FACULTY
+  STUDENT
+}
+
+model Course {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sections Section[]
+
+  @@map("course")
+}
+
+model Room {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  no          String   @unique
+  maxCapacity Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sections Section[]
+
+  @@map("room")
+}
+
+model Section {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  day       Day
+  startTime DateTime
+  endTime   DateTime
+
+  timeSlot TimeSlot?
+
+  course    Course            @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  courseId  String            @db.ObjectId
+  room      Room              @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  roomId    String            @db.ObjectId
+  faculty   User              @relation(fields: [facultyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  facultyId String            @db.ObjectId
+  schedules StudentSchedule[]
+
+  tests Test[]
+
+  @@map("section")
+}
+
+model TimeSlot {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  day       Day
+  startTime DateTime
+  endTime   DateTime
+
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sectionId String  @unique @db.ObjectId
+
+  @@map("timeSlot")
+}
+
+model StudentSchedule {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tests EnrollmentTest[]
+
+  student   User    @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  studentId String  @db.ObjectId
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sectionId String  @db.ObjectId
+
+  @@unique([studentId, sectionId])
+  @@map("enrollment")
+}
+
+model Question {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  question String
+  options  String[]
+  answer   Int
+
+  test   Test   @relation(fields: [testId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  testId String @db.ObjectId
+
+  @@map("question")
+}
+
+model Admin {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  email    String @unique
+  password String
+
+  @@map("admin")
+}
+
+model Test {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  name        String
+  slug        String   @unique
+  description String
+  maxAttempts Int      @default(1)
+
+  questions Question[]
+  students  EnrollmentTest[]
+
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sectionId String  @db.ObjectId
+
+  @@map("test")
+}
+
+model EnrollmentTest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status   TestStatus @default(NOT_ATTEMPTED)
+  attempts Int
+  score    Int
+
+  enrollment   StudentSchedule @relation(fields: [enrollmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  enrollmentId String          @db.ObjectId
+  test         Test            @relation(fields: [testId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  testId       String          @db.ObjectId
+
+  @@unique([enrollmentId, testId])
+  @@map("enrollmentTest")
+}
+
+enum Day {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum TestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  ATTEMPTED
+  NOT_ATTEMPTED
+}
